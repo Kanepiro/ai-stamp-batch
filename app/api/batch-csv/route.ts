@@ -23,7 +23,7 @@ async function openaiFetch(path: string, init?: RequestInit) {
 }
 
 function buildPrompt(text: string, theme: string) {
-  // v4.0.004: CSV batch must use the same long prompt as /api/generate.
+  // v4.0.005: CSV batch must use the same long prompt as /api/generate.
   const t = (text || "").trim() || "PayPay銀行へ入金よろしく";
   const th = (theme || "").trim() || "麦色の毛の猫";
 

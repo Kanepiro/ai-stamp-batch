@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const OUTPUT_WIDTH = 370;
 const OUTPUT_HEIGHT = 320; // 370 x 320 PNG (LINE static sticker max)
@@ -23,6 +23,38 @@ export default function Home() {
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canSave = !!imageUrl && !loading;
+
+  // Persist the latest CSV Batch info so it's not lost after app restart.
+  const BATCH_STORAGE_KEY = "ai-stamp-last-batch";
+
+  function persistBatchInfo(next: {
+    batch_id: string;
+    items: Array<{ custom_id: string; message: string; keyword: string }>;
+  } | null) {
+    try {
+      if (!next) {
+        localStorage.removeItem(BATCH_STORAGE_KEY);
+        return;
+      }
+      localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // ignore (localStorage may be unavailable)
+    }
+  }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BATCH_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as any;
+      if (!parsed?.batch_id || !Array.isArray(parsed?.items)) return;
+      setBatchInfo({ batch_id: String(parsed.batch_id), items: parsed.items });
+      setBatchStatus(`前回の Batch を復元しました: ${String(parsed.batch_id)}`);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleGenerate() {
     setStatus("生成中…");
@@ -302,6 +334,7 @@ export default function Home() {
         return;
       }
       setBatchInfo({ batch_id, items: outItems });
+      persistBatchInfo({ batch_id, items: outItems });
       setBatchStatus(`Batch 受付完了: ${batch_id}`);
     } catch (e) {
       console.error(e);
@@ -309,6 +342,13 @@ export default function Home() {
     } finally {
       setBatchLoading(false);
     }
+  }
+
+  function handleClearBatch() {
+    setBatchInfo(null);
+    setBatchProgress(null);
+    setBatchStatus("Batch 情報をクリアしました");
+    persistBatchInfo(null);
   }
 
   async function handleBatchDownloadAll() {
@@ -372,7 +412,7 @@ export default function Home() {
       <div className="card">
         <div className="header">
           <div className="title">AI-Stamp</div>
-          <div className="version">v4.0.004</div>
+          <div className="version">v4.0.005</div>
         </div>
 
         <div className="row">
@@ -448,6 +488,9 @@ export default function Home() {
               title={!batchInfo ? "先にCSVを投入してください" : "Batch完了まで待ちつつ順次ダウンロード"}
             >
               {batchLoading ? "処理中…" : "全部ダウンロード"}
+            </button>
+            <button className="secondary-btn" onClick={handleClearBatch} disabled={batchLoading}>
+              クリア
             </button>
           </div>
           <div style={{ fontSize: 11, color: "#888", marginTop: 6, lineHeight: 1.4 }}>
